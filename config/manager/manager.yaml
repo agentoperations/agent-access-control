@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-access-controller
+  namespace: agent-access-control-system
+  labels:
+    app: agent-access-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-access-controller
+  template:
+    metadata:
+      labels:
+        app: agent-access-controller
+    spec:
+      serviceAccountName: agent-access-controller
+      containers:
+        - name: controller
+          image: quay.io/azaalouk/agent-access-control:latest
+          args:
+            - --gateway-name=$(GATEWAY_NAME)
+            - --gateway-namespace=$(GATEWAY_NAMESPACE)
+            - --leader-elect
+          env:
+            - name: GATEWAY_NAME
+              value: "data-science-gateway"
+            - name: GATEWAY_NAMESPACE
+              value: "openshift-ingress"
+          ports:
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+      terminationGracePeriodSeconds: 10

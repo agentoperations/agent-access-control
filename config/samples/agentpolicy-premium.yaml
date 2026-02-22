@@ -1,0 +1,37 @@
+apiVersion: kagenti.com/v1alpha1
+kind: AgentPolicy
+metadata:
+  name: premium-tier
+spec:
+  agentSelector:
+    matchLabels:
+      tier: premium
+  ingress:
+    allowedAgents:
+      - orchestrator
+      - planner
+      - qa-agent
+    allowedUsers:
+      - "*"
+  agents:
+    - summarizer
+    - classifier
+    - code-review-agent
+  mcpTools:
+    virtualServerRef: premium-tools-vs
+  external:
+    defaultMode: deny
+    rules:
+      - host: api.github.com
+        mode: exchange
+        audience: github-api
+        scopes:
+          - repo
+          - pull_request
+      - host: api.openai.com
+        mode: vault
+        vaultPath: secret/data/openai-key
+        header: Authorization
+        headerPrefix: "Bearer "
+  rateLimit:
+    requestsPerMinute: 200

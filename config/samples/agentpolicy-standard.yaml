@@ -1,0 +1,29 @@
+apiVersion: kagenti.com/v1alpha1
+kind: AgentPolicy
+metadata:
+  name: standard-tier
+spec:
+  agentSelector:
+    matchLabels:
+      tier: standard
+  ingress:
+    allowedAgents:
+      - orchestrator
+      - planner
+    allowedUsers:
+      - "*"
+  agents:
+    - summarizer
+    - classifier
+  external:
+    defaultMode: deny
+    rules:
+      - host: api.openweathermap.org
+        mode: vault
+        vaultPath: secret/data/openweathermap
+        header: x-api-key
+        headerPrefix: ""
+      - host: weather.gov
+        mode: passthrough
+  rateLimit:
+    requestsPerMinute: 60

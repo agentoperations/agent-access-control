@@ -1,0 +1,10 @@
+# Build output
+bin/
+cover.out
+
+# IDE
+.vscode/
+.idea/
+
+# Showtime scripts (demo videos and thumbnails are kept)
+*.show

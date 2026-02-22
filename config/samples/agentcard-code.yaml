@@ -1,0 +1,19 @@
+apiVersion: kagenti.com/v1alpha1
+kind: AgentCard
+metadata:
+  name: code-review-agent
+  labels:
+    tier: premium
+    domain: development
+spec:
+  description: "AI-powered code review agent"
+  protocols:
+    - a2a
+    - mcp
+    - rest
+  skills:
+    - name: review-pr
+      description: "Reviews pull request code changes"
+    - name: suggest-fix
+      description: "Suggests code fixes for identified issues"
+  servicePort: 8080

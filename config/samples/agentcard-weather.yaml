@@ -1,0 +1,18 @@
+apiVersion: kagenti.com/v1alpha1
+kind: AgentCard
+metadata:
+  name: weather-agent
+  labels:
+    tier: standard
+    domain: weather
+spec:
+  description: "Agent providing weather forecasts and alerts"
+  protocols:
+    - a2a
+    - rest
+  skills:
+    - name: get-forecast
+      description: "Returns weather forecast for a location"
+    - name: weather-alerts
+      description: "Returns active weather alerts for a region"
+  servicePort: 8080

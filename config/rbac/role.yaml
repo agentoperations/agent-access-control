@@ -1,0 +1,38 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agent-access-controller
+rules:
+  # AgentCard and AgentPolicy CRDs
+  - apiGroups: ["kagenti.com"]
+    resources: ["agentcards", "agentcards/status", "agentcards/finalizers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["kagenti.com"]
+    resources: ["agentpolicies", "agentpolicies/status", "agentpolicies/finalizers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Gateway API HTTPRoutes
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Kuadrant policies (optional — controller handles missing CRDs gracefully)
+  - apiGroups: ["kuadrant.io"]
+    resources: ["authpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["kuadrant.io"]
+    resources: ["ratelimitpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # MCP Gateway (optional)
+  - apiGroups: ["mcp.kagenti.com"]
+    resources: ["mcpserverregistrations"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ConfigMaps for sidecar proxy config
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
