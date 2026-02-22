@@ -8,3 +8,5 @@ cover.out
 
 # Showtime scripts (demo videos and thumbnails are kept)
 *.show
+bin/
+main
