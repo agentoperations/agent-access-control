@@ -11,7 +11,7 @@ AI agents are programs that make decisions and take actions autonomously. When y
 
 Today, every agent team builds this security from scratch:
 
-<img src="concept-problem.png" alt="The Problem" width="400">
+<img src="images/concept-problem.png" alt="The Problem" width="400">
 
 Each agent duplicates the same auth code, token management, and rate limiting logic. It's error-prone, inconsistent, and slows development.
 
@@ -19,7 +19,7 @@ Each agent duplicates the same auth code, token management, and rate limiting lo
 
 A platform-level controller that handles all of this automatically:
 
-<img src="concept-solution.png" alt="The Solution" width="400">
+<img src="images/concept-solution.png" alt="The Solution" width="400">
 
 Agents contain only business logic. The controller generates all auth infrastructure. Agent developers never write auth code, manage tokens, or configure gateways.
 
@@ -27,7 +27,7 @@ Agents contain only business logic. The controller generates all auth infrastruc
 
 Here is the complete system — from developer to external APIs:
 
-![Full Architecture](arch-full-system.png)
+![Full Architecture](images/arch-full-system.png)
 
 The system has six layers: Developer → Control Plane → Generated Resources → Gateway → Agent Pod → External Services. Each layer handles a specific concern, and data flows top-to-bottom (deployment) and left-to-right (runtime requests).
 
@@ -41,7 +41,7 @@ Before walking through the demo, here are the core ideas.
 
 Agents are not manually registered. A discovery controller finds them automatically:
 
-![Discovery](concept-discovery.png)
+![Discovery](images/concept-discovery.png)
 
 1. Developer deploys their agent with a label (`kagenti.com/agent=true`)
 2. Discovery controller detects the pod
@@ -53,7 +53,7 @@ The developer never writes a CRD. The AgentCard is discovered, like a Kubernetes
 
 Here's the full sequence from deployment to enforcement:
 
-![Reconciliation Sequence](seq-reconcile.png)
+![Reconciliation Sequence](images/seq-reconcile.png)
 
 The developer deploys once. Five resources are generated automatically. The gateway starts enforcing immediately.
 
@@ -61,7 +61,7 @@ The developer deploys once. Five resources are generated automatically. The gate
 
 An `AgentPolicy` selects agents by label — not by name. One policy can cover many agents:
 
-![Policy Matching](concept-policy-match.png)
+![Policy Matching](images/concept-policy-match.png)
 
 The policy `matchLabels: domain=weather` matches both `weather-agent` and `forecast-agent`, but not `code-agent`. Each matched agent gets its own set of generated resources.
 
@@ -71,7 +71,7 @@ This means the platform team writes policies per group (by domain, team, environ
 
 From two CRDs, the controller generates five types of Kubernetes resources:
 
-![Generated Resources](concept-generated.png)
+![Generated Resources](images/concept-generated.png)
 
 | Resource | What it does | Who enforces it |
 |---|---|---|
@@ -85,7 +85,7 @@ From two CRDs, the controller generates five types of Kubernetes resources:
 
 The system splits enforcement into two directions:
 
-![Traffic Flow](diagram-traffic-flow.png)
+![Traffic Flow](images/diagram-traffic-flow.png)
 
 **Inbound** (someone calling this agent):
 - Handled by the **gateway** (Authorino for auth, Limitador for rate limits)
@@ -98,25 +98,25 @@ The system splits enforcement into two directions:
 
 #### Sequence: Inbound call (user or agent calling this agent)
 
-![Inbound Call](seq-inbound-call.png)
+![Inbound Call](images/seq-inbound-call.png)
 
 The caller's JWT is validated by Authorino, rate-checked by Limitador, then forwarded to the agent. The agent never validates tokens — the gateway already did.
 
 #### Sequence: Agent-to-agent call
 
-![Agent to Agent](seq-agent-to-agent.png)
+![Agent to Agent](images/seq-agent-to-agent.png)
 
 Agent A's call goes through its sidecar (passthrough to gateway), then through the gateway where Authorino checks whether Agent A is in Agent B's `allowedAgents` list. The gateway enforces the policy — neither agent has auth code.
 
 #### Sequence: Outbound call to external API (Vault credential injection)
 
-![Outbound External](seq-outbound-external.png)
+![Outbound External](images/seq-outbound-external.png)
 
 The sidecar intercepts the outbound call, fetches the API key from Vault, replaces the Authorization header, and forwards. The agent never sees the API key.
 
 #### Sequence: MCP tool call through MCP Gateway
 
-![MCP Call](seq-mcp-call.png)
+![MCP Call](images/seq-mcp-call.png)
 
 The MCP Gateway aggregates tools from multiple MCP servers into a single `/mcp` endpoint. The Router (ext_proc) parses the tool name prefix to determine which backend server handles the call. Tools are filtered per-agent via MCPVirtualServer.
 
@@ -124,7 +124,7 @@ The MCP Gateway aggregates tools from multiple MCP servers into a single `/mcp` 
 
 This project and the Auth Sidecar ADR are two halves of the same system:
 
-![Complement](concept-complement.png)
+![Complement](images/concept-complement.png)
 
 - **This project** generates the policy infrastructure (gateway config + sidecar config)
 - **The ADR's sidecar** enforces outbound rules at runtime using the generated ConfigMap

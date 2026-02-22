@@ -28,7 +28,7 @@ The three layers of enforcement: inbound JWT auth via Authorino, per-tier rate l
 
 The controller watches two CRDs and generates all downstream infrastructure:
 
-![Reconciliation Flow](docs/diagram-reconciliation.png)
+![Reconciliation Flow](docs/images/diagram-reconciliation.png)
 
 1. An **AgentCard** represents an agent's identity: description, protocols, skills, and service port. AgentCards are **discovered automatically** from running agents — not written by developers. A2A agents expose `/.well-known/agent.json`, MCP agents expose `tools/list`, and the discovery controller creates the AgentCard CR from this metadata.
 2. An **AgentPolicy** selects one or more AgentCards by label, then declares ingress rules, agent-to-agent permissions, MCP tool federation, external credential policies, and rate limits.
@@ -36,7 +36,7 @@ The controller watches two CRDs and generates all downstream infrastructure:
 
 ### Who does what
 
-![Ownership Model](docs/diagram-ownership.png)
+![Ownership Model](docs/images/diagram-ownership.png)
 
 - **Agent developers** deploy their agent (`Deployment` + `Service`) with a label `kagenti.com/agent: "true"`. That's it. No CRDs, no gateway config, no auth code.
 - **Discovery controller** detects labeled agents, fetches their agent card / capabilities, and creates the `AgentCard` CR automatically.
@@ -45,7 +45,7 @@ The controller watches two CRDs and generates all downstream infrastructure:
 
 ### Traffic flow
 
-![Traffic Flow](docs/diagram-traffic-flow.png)
+![Traffic Flow](docs/images/diagram-traffic-flow.png)
 
 | Call type | Path | Enforced by |
 |---|---|---|
@@ -205,7 +205,7 @@ kubectl set env deployment/agent-access-controller \
   -n agent-access-control-system
 ```
 
-Or edit `config/manager/manager.yaml` directly before deploying.
+Or edit `deploy/manager.yaml` directly before deploying.
 
 ### Verify the controller is running
 
@@ -330,17 +330,21 @@ agent-access-control/
 │   └── builders_test.go                     # Unit tests for builders
 ├── config/
 │   ├── crd/bases/                           # Generated CRD YAML
-│   ├── manager/manager.yaml                 # Controller Deployment
-│   ├── rbac/                                # ClusterRole, binding, ServiceAccount
 │   └── samples/                             # Example CRs
+├── deploy/                                  # Kubernetes deployment manifests
+│   ├── manager.yaml                         # Controller Deployment
+│   ├── namespace.yaml                       # Controller namespace
+│   ├── role.yaml                            # ClusterRole
+│   ├── role_binding.yaml                    # ClusterRoleBinding
+│   └── service_account.yaml                 # ServiceAccount
 ├── hack/
 │   ├── demo.mp4                             # Demo: setup & lifecycle
 │   ├── demo-access-control.mp4              # Demo: access control enforcement
 │   └── demo-setup.sh                        # Demo environment setup script
 ├── docs/
-│   ├── diagram-reconciliation.png           # Controller flow
-│   ├── diagram-traffic-flow.png             # Runtime traffic paths
-│   └── diagram-ownership.png                # Who writes what
+│   ├── auth-concepts.md                     # Auth flows with sequence diagrams
+│   ├── demo-walkthrough.md                  # Step-by-step demo with ADR comparison
+│   └── images/                              # Architecture and sequence diagrams
 ├── Makefile
 ├── Dockerfile
 ├── LICENSE                                  # Apache License 2.0

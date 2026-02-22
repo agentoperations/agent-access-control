@@ -34,12 +34,10 @@ docker-push:
 	docker push $(IMG)
 
 deploy: install
-	kubectl apply -f config/rbac/
-	kubectl apply -f config/manager/manager.yaml
+	kubectl apply -f deploy/
 
 undeploy:
-	kubectl delete -f config/manager/manager.yaml --ignore-not-found
-	kubectl delete -f config/rbac/ --ignore-not-found
+	kubectl delete -f deploy/ --ignore-not-found
 
 clean:
 	rm -rf bin/ cover.out

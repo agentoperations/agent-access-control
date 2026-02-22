@@ -4,7 +4,7 @@ This document explains the auth model for agent access control — what tokens a
 
 ## Auth Components
 
-![Auth Components](auth-components.png)
+![Auth Components](images/auth-components.png)
 
 The system has three layers:
 
@@ -41,7 +41,7 @@ The system has three layers:
 
 This is the most common flow. A user or another agent calls an agent through the gateway.
 
-![Inbound Auth Flow](auth-flow-inbound.png)
+![Inbound Auth Flow](images/auth-flow-inbound.png)
 
 ### What happens step by step
 
@@ -84,7 +84,7 @@ The controller generates the AuthPolicy and RateLimitPolicy. Authorino and Limit
 
 When an agent calls an internal service that requires a scoped token (not the agent's broad JWT), the sidecar performs OAuth 2.0 Token Exchange (RFC 8693).
 
-![Token Exchange Flow](auth-flow-token-exchange.png)
+![Token Exchange Flow](images/auth-flow-token-exchange.png)
 
 ### What happens step by step
 
@@ -149,7 +149,7 @@ The controller puts this in the sidecar's ConfigMap. The sidecar reads it and pe
 
 When an agent calls an external API that uses API keys (not OAuth), the sidecar fetches the key from Vault and injects it.
 
-![Vault Flow](auth-flow-vault.png)
+![Vault Flow](images/auth-flow-vault.png)
 
 ### What happens step by step
 
@@ -204,7 +204,7 @@ external:
 
 When an agent tries to call a host not in its allow list, the sidecar blocks it.
 
-![Deny Flow](auth-flow-deny.png)
+![Deny Flow](images/auth-flow-deny.png)
 
 The request never leaves the pod. The agent gets a 403 with a clear error message. This prevents:
 
