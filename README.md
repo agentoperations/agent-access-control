@@ -385,7 +385,7 @@ The registry knows the agent's dependency graph (models, tools, skills) at build
 
 | Document | Description |
 |---|---|
-| [Presentation](https://kagenti.github.io/agent-access-control/presentation.html) | Slide deck: architecture, personas, agent gateway, MCP integration |
+| [Presentation](https://agentoperations.github.io/agent-access-control/presentation.html) | Slide deck: architecture, personas, agent gateway, MCP integration |
 | [Auth Concepts](docs/auth-concepts.md) | Auth components, token types, and all four auth flows with sequence diagrams |
 | [Demo Walkthrough](docs/demo-walkthrough.md) | Step-by-step demo with ADR comparison |
 | [Setup & Lifecycle Demo](hack/demo.mp4) | Video: CRD install, AgentCards, AgentPolicies, generated resources, cascade deletion |
