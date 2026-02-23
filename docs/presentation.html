@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Access Control</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --r-background-color: #0a0e17;
+    --r-main-color: #c9d1d9;
+    --r-heading-color: #e6edf3;
+    --r-link-color: #58a6ff;
+    --r-selection-background-color: #1f6feb;
+    --r-heading-font: 'Inter', -apple-system, sans-serif;
+    --r-main-font: 'Inter', -apple-system, sans-serif;
+    --r-code-font: 'JetBrains Mono', monospace;
+    --r-main-font-size: 30px;
+  }
+  .reveal { font-weight: 300; letter-spacing: 0.01em; }
+  .reveal h1 { font-size: 2.2em; font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+  .reveal h2 { font-size: 1.3em; font-weight: 600; color: #58a6ff; border-bottom: 1px solid #21262d; padding-bottom: 10px; margin-bottom: 0.6em; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.01em; }
+  .reveal h3 { font-size: 0.95em; font-weight: 600; color: #bc8cff; font-family: 'JetBrains Mono', monospace; }
+  .reveal pre { font-size: 0.58em; box-shadow: none; margin: 12px 0; }
+  .reveal code { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
+  .reveal pre code {
+    padding: 18px 20px;
+    border-radius: 6px;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    line-height: 1.5;
+    font-size: 0.95em;
+  }
+  .reveal p code, .reveal li code {
+    background: #161b22;
+    border: 1px solid #21262d;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: #79c0ff;
+  }
+  .reveal li { margin-bottom: 0.4em; font-size: 0.82em; line-height: 1.5; }
+  .reveal .subtitle { color: #8b949e; font-size: 0.65em; font-weight: 300; margin-top: 0.5em; font-family: 'Inter', sans-serif; }
+  .reveal .badge { display: inline-block; padding: 3px 12px; border-radius: 4px; font-size: 0.5em; font-weight: 500; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 3px; font-family: 'JetBrains Mono', monospace; border: 1px solid; }
+  .badge-blue { background: #0d1f3c; color: #58a6ff; border-color: #1f3d6e; }
+  .badge-purple { background: #1a0533; color: #bc8cff; border-color: #3b1f6e; }
+  .badge-green { background: #0a2e1a; color: #3fb950; border-color: #1b6e3a; }
+  .badge-orange { background: #2a1507; color: #d29922; border-color: #6e4a1f; }
+  .badge-red { background: #2a0a0a; color: #f85149; border-color: #6e1f1f; }
+  .badge-gray { background: #161b22; color: #8b949e; border-color: #30363d; }
+  .badge-teal { background: #0a2a2a; color: #39d2c0; border-color: #1a5e5e; }
+  .reveal table { font-size: 0.58em; border-collapse: collapse; width: 100%; font-family: 'JetBrains Mono', monospace; }
+  .reveal table th { background: #161b22; color: #58a6ff; font-weight: 500; text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  .reveal table td { padding: 6px 12px; border-bottom: 1px solid #161b22; color: #c9d1d9; }
+  .reveal .flow-box { background: #0d1117; border-radius: 6px; padding: 12px 18px; margin: 8px 0; font-size: 0.68em; border-left: 3px solid #1f6feb; border: 1px solid #21262d; border-left: 3px solid #1f6feb; }
+  .reveal .flow-box.purple { border-left-color: #8b5cf6; }
+  .reveal .flow-box.green { border-left-color: #3fb950; }
+  .reveal .flow-box.orange { border-left-color: #d29922; }
+  .reveal .flow-box.red { border-left-color: #f85149; }
+  .reveal .flow-box.teal { border-left-color: #39d2c0; }
+  .reveal .two-col { display: flex; gap: 30px; }
+  .reveal .two-col > div { flex: 1; }
+  .reveal .dim { color: #484f58; }
+  .reveal .highlight { color: #ffa657; }
+  .reveal .slide-number { background: transparent; color: #30363d; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+  .reveal .footer-text { position: fixed; bottom: 14px; left: 24px; font-size: 11px; color: #30363d; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; }
+  .reveal strong { color: #e6edf3; font-weight: 600; }
+  .reveal .prompt::before { content: '$ '; color: #3fb950; }
+  .reveal .cursor { display: inline-block; width: 8px; height: 1.1em; background: #58a6ff; animation: blink 1s step-end infinite; vertical-align: text-bottom; margin-left: 2px; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ============ TITLE ============ -->
+<section>
+  <p style="font-size:0.4em; color:#30363d; font-family:'JetBrains Mono',monospace; margin-bottom:30px;">v0.1.0-alpha</p>
+  <h1>agent<span style="color:#f85149;">access</span><span style="color:#58a6ff;">control</span></h1>
+  <p class="subtitle">the agent gateway for Kubernetes</p>
+  <br>
+  <p style="font-size:0.5em;">
+    <span class="badge badge-teal">discovery</span>
+    <span class="badge badge-red">auth</span>
+    <span class="badge badge-blue">routing</span>
+    <span class="badge badge-green">credentials</span>
+    <span class="badge badge-orange">rate-limits</span>
+    <span class="badge badge-purple">mcp</span>
+  </p>
+  <p style="font-size:0.35em; color:#30363d; font-family:'JetBrains Mono',monospace; margin-top:40px;">
+    <span style="color:#3fb950;">$</span> kubectl apply -f agentpolicy.yaml<span class="cursor"></span>
+  </p>
+</section>
+
+<!-- ============ THE PROBLEM ============ -->
+<section>
+  <h2>The Problem</h2>
+  <ul>
+    <li class="fragment">AI agents are calling other agents, external APIs, and LLMs &mdash; but there's <strong>no standard way to secure these interactions</strong></li>
+    <li class="fragment">Every team hand-wires auth, rate limiting, and credential injection &mdash; <strong>scattered across code, envvars, and sidecars</strong></li>
+    <li class="fragment">No visibility into <strong>who can call what</strong>, which agents talk to each other, or how outbound API keys are managed</li>
+    <li class="fragment">Agents get deployed with <strong>hardcoded secrets</strong>, no access control, and no rate limits &mdash; a security incident waiting to happen</li>
+  </ul>
+</section>
+
+<!-- ============ WHAT IT IS ============ -->
+<section>
+  <h2>What Agent Access Control Is</h2>
+  <div class="fragment flow-box">
+    A <strong>Kubernetes operator</strong> that separates agent development from platform security &mdash; two personas, two CRDs, zero overlap
+  </div>
+  <div class="fragment flow-box purple">
+    <strong>AI Engineers</strong> push code and add a label. <strong>Platform Engineers</strong> own GitOps and define security policies. Neither touches the other's domain.
+  </div>
+  <div class="fragment flow-box green">
+    The operator auto-discovers agents and generates <strong>HTTPRoutes</strong>, <strong>AuthPolicies</strong>, <strong>RateLimitPolicies</strong>, and <strong>sidecar ConfigMaps</strong>
+  </div>
+  <div class="fragment flow-box orange">
+    Integrates with <strong>Kuadrant</strong> (Authorino + Limitador), <strong>Gateway API</strong>, and <strong>HashiCorp Vault</strong> &mdash; no vendor lock-in
+  </div>
+</section>
+
+<!-- ============ TWO CRDs ============ -->
+<section>
+  <h2>Two CRDs, Two Personas</h2>
+  <div class="two-col">
+    <div>
+      <h3><span class="badge badge-blue">AgentCard</span> <span style="font-size:0.7em; color:#8b949e;">auto-generated</span></h3>
+      <ul>
+        <li class="fragment"><strong>Created by the operator</strong> &mdash; no human writes this</li>
+        <li class="fragment">Discovered from agent endpoints at runtime</li>
+        <li class="fragment">Skills, protocols (A2A, REST, MCP)</li>
+        <li class="fragment">Labels inherited from pod for policy matching</li>
+        <li class="fragment">Generates an <strong>HTTPRoute</strong> automatically</li>
+      </ul>
+    </div>
+    <div>
+      <h3><span class="badge badge-red">AgentPolicy</span> <span style="font-size:0.7em; color:#8b949e;">platform engineer</span></h3>
+      <ul>
+        <li class="fragment"><strong>The only CRD a human writes</strong></li>
+        <li class="fragment">Selects discovered agents via <code>matchLabels</code></li>
+        <li class="fragment">Inbound: allowed agents &amp; users</li>
+        <li class="fragment">Outbound: credential rules per host</li>
+        <li class="fragment">Rate limiting, MCP tool references</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AGENT DISCOVERY ============ -->
+<section>
+  <h2>Agent Discovery</h2>
+  <p style="font-size:0.7em; color:#94a3b8;">AgentCards are discovered, not written. The AI Engineer adds a label. GitOps deploys. The operator discovers.</p>
+  <pre class="fragment"><code class="language-text" data-trim>
+AI Engineer adds label         GitOps deploys pod                 AgentCard CR
+kagenti=true, commits          Discovery controller watches       created automatically
+────────────────────────       ──────────────────────────         ──────────────────────
+
+A2A agent                 &rarr;    GET /.well-known/agent.json   &rarr;  protocols: [a2a]
+                                 (name, skills, protocols)         skills: [...]
+
+MCP agent                 &rarr;    POST /tools/list              &rarr;  protocols: [mcp]
+                                 (available tools)                 skills: [from tools]
+
+REST agent                &rarr;    GET /openapi.json             &rarr;  protocols: [rest]
+                                 (endpoints, schemas)              skills: [from paths]
+  </code></pre>
+  <p class="fragment" style="font-size:0.6em; color:#94a3b8;">The AI Engineer never writes a CRD or runs kubectl. They commit, GitOps deploys, the operator discovers.</p>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section>
+  <h2>How It Works</h2>
+  <pre><code class="language-text" data-trim>
+AI ENGINEER                 PLATFORM (GitOps + Operator)      PLATFORM ENGINEER
+───────────                 ────────────────────────────      ─────────────────
+
+1. Push image, add           GitOps (ArgoCD/Flux)
+   kagenti label to          syncs manifests to cluster
+   Deployment, commit                |
+                             Discovery controller              2. Define AgentPolicy
+                             fetches agent metadata                per tier, commit
+                             creates AgentCard CR                  to git
+                                     |                                  |
+                             AgentCard controller               GitOps syncs policy
+                             generates HTTPRoute                        |
+                                     |                                  |
+                             AgentPolicy controller  &lt;──────────────────┘
+                             matches cards by labels
+                             generates AuthPolicy, RateLimitPolicy, ConfigMap
+                                     |
+3. Agent receives traffic    Gateway routes via HTTPRoute
+   (no action needed)        Authorino + Limitador + Sidecar enforce everything
+  </code></pre>
+</section>
+
+<!-- ============ AGENTCARD EXAMPLE ============ -->
+<section>
+  <h2>What Discovery Produces</h2>
+  <p style="font-size:0.7em; color:#94a3b8;">The AI Engineer commits a labeled Deployment. GitOps deploys it. The discovery controller creates this CR &mdash; no human writes it.</p>
+  <pre class="fragment"><code class="language-yaml" data-trim>
+# Auto-generated from /.well-known/agent.json
+apiVersion: kagenti.com/v1alpha1
+kind: AgentCard
+metadata:
+  name: weather-agent
+  labels:
+    tier: standard          # from pod labels
+    domain: weather         # from pod labels
+spec:
+  description: "Agent providing weather forecasts and alerts"
+  protocols:
+    - a2a
+    - rest
+  skills:                   # extracted from agent card
+    - name: get-forecast
+      description: "Returns weather forecast for a location"
+    - name: weather-alerts
+      description: "Returns active weather alerts for a region"
+  servicePort: 8080
+  </code></pre>
+</section>
+
+<!-- ============ AGENTPOLICY EXAMPLE ============ -->
+<section>
+  <h2>Platform Engineer: Apply a Policy</h2>
+  <p style="font-size:0.7em; color:#94a3b8;">The only CRD a human writes. The Platform Engineer defines security rules that select discovered agents by label.</p>
+  <pre class="fragment"><code class="language-yaml" data-trim>
+apiVersion: kagenti.com/v1alpha1
+kind: AgentPolicy
+metadata:
+  name: standard-tier
+spec:
+  agentSelector:
+    matchLabels:
+      tier: standard
+  ingress:
+    allowedAgents: [orchestrator, planner]
+    allowedUsers: ["*"]
+  external:
+    defaultMode: deny
+    rules:
+      - host: api.openweathermap.org
+        mode: vault
+        vaultPath: secret/data/openweathermap
+      - host: weather.gov
+        mode: passthrough
+  rateLimit:
+    requestsPerMinute: 60
+  </code></pre>
+</section>
+
+<!-- ============ CREDENTIAL MODES ============ -->
+<section>
+  <h2>Four Credential Modes</h2>
+  <table>
+    <thead>
+      <tr><th>Mode</th><th>How It Works</th><th>Use Case</th></tr>
+    </thead>
+    <tbody>
+      <tr class="fragment">
+        <td><span class="badge badge-green">vault</span></td>
+        <td>Sidecar fetches secret from HashiCorp Vault, injects into outbound request header</td>
+        <td>API keys, static tokens</td>
+      </tr>
+      <tr class="fragment">
+        <td><span class="badge badge-purple">exchange</span></td>
+        <td>RFC 8693 Token Exchange &mdash; trades inbound JWT for scoped downstream token</td>
+        <td>OAuth2 APIs (GitHub, cloud)</td>
+      </tr>
+      <tr class="fragment">
+        <td><span class="badge badge-blue">passthrough</span></td>
+        <td>Forwards the caller's credentials without transformation</td>
+        <td>Public APIs, internal services</td>
+      </tr>
+      <tr class="fragment">
+        <td><span class="badge badge-red">deny</span></td>
+        <td>Blocks the outbound request entirely</td>
+        <td>Default policy, untrusted hosts</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="fragment" style="font-size:0.6em; color:#94a3b8;">Credential injection happens in the sidecar forward proxy &mdash; zero code changes in the agent.</p>
+</section>
+
+<!-- ============ GENERATED RESOURCES ============ -->
+<section>
+  <h2>What Gets Generated</h2>
+  <div class="two-col" style="font-size:0.65em;">
+    <div>
+      <h3>From <span style="color:#58a6ff;">AgentCard</span></h3>
+      <div class="flow-box"><strong>HTTPRoute</strong><br>Gateway API routing rule for the agent's service</div>
+      <div class="flow-box teal"><strong>MCPServerRegistration</strong><br>Registered if agent declares <code>mcp</code> protocol (optional CRD)</div>
+    </div>
+    <div>
+      <h3>From <span style="color:#f85149;">AgentPolicy</span></h3>
+      <div class="flow-box red"><strong>AuthPolicy</strong><br>Kuadrant/Authorino inbound JWT validation</div>
+      <div class="flow-box orange"><strong>RateLimitPolicy</strong><br>Kuadrant/Limitador per-agent rate limits</div>
+      <div class="flow-box green"><strong>Sidecar ConfigMap</strong><br>Forward proxy config for outbound credential injection</div>
+    </div>
+  </div>
+  <p class="fragment" style="font-size:0.6em; color:#94a3b8; margin-top:16px;">One AgentPolicy matching N agents generates N sets of downstream resources.</p>
+</section>
+
+<!-- ============ POLICY TIERS ============ -->
+<section>
+  <h2>Policy Tiers in Practice</h2>
+  <div class="two-col" style="font-size:0.62em;">
+    <div>
+      <div class="flow-box" style="border-left-color:#8b949e;">
+        <strong>Standard Tier</strong> <span class="badge badge-gray">tier: standard</span>
+        <ul style="margin-top:8px;">
+          <li>60 req/min rate limit</li>
+          <li>Vault-based API key injection</li>
+          <li>2 allowed caller agents</li>
+          <li>Passthrough for public APIs</li>
+          <li>Deny by default</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="flow-box purple">
+        <strong>Premium Tier</strong> <span class="badge badge-purple">tier: premium</span>
+        <ul style="margin-top:8px;">
+          <li>200 req/min rate limit</li>
+          <li>Token Exchange for OAuth2 APIs</li>
+          <li>3 allowed caller agents</li>
+          <li>MCP tool references</li>
+          <li>Scoped access (repo, pull_request)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <pre class="fragment"><code class="language-yaml" data-trim>
+# Premium: OAuth2 token exchange for GitHub API
+external:
+  rules:
+    - host: api.github.com
+      mode: exchange
+      audience: github-api
+      scopes: [repo, pull_request]
+  </code></pre>
+</section>
+
+<!-- ============ RECONCILIATION ============ -->
+<section>
+  <h2>Reconciliation Flow</h2>
+  <pre><code class="language-text" data-trim>
+Labeled pod detected
+        |
+        v
+DiscoveryController
+  |- Fetch /.well-known/agent.json (A2A) or /tools/list (MCP)
+  |- Create AgentCard CR with metadata + pod labels
+        |
+        v
+AgentCardReconciler
+  |- Add finalizer
+  |- Build HTTPRoute (host, paths, gateway ref)
+  |- Create or Update HTTPRoute
+  |- If "mcp" in protocols &rarr; create MCPServerRegistration
+  |- Update status: Ready condition + generatedHTTPRoute
+        |
+        v  (watcher triggers)
+AgentPolicyReconciler
+  |- List AgentCards matching policy.spec.agentSelector.matchLabels
+  |- For each matched card:
+  |    |- Find card's HTTPRoute
+  |    |- If ingress defined  &rarr; create/update AuthPolicy
+  |    |- If rateLimit defined &rarr; create/update RateLimitPolicy
+  |    |- If external defined &rarr; create/update sidecar ConfigMap
+  |- Update status: matchedAgentCards count + generatedResources list
+  </code></pre>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section>
+  <h2>Architecture</h2>
+  <div class="two-col" style="font-size:0.65em;">
+    <div>
+      <div class="flow-box teal"><strong>Discovery Controller</strong><br>Watches labeled pods, fetches agent metadata, creates AgentCard CRs</div>
+      <div class="flow-box"><strong>AgentCard Controller</strong><br>Watches AgentCards, generates HTTPRoutes + MCPServerRegistration</div>
+      <div class="flow-box red"><strong>AgentPolicy Controller</strong><br>Watches AgentPolicies + AgentCards, generates AuthPolicy, RateLimitPolicy, ConfigMaps</div>
+      <div class="flow-box orange"><strong>Sidecar Proxies</strong><br>Reverse proxy (inbound auth) + Forward proxy (outbound credentials)</div>
+    </div>
+    <div>
+      <div class="flow-box" style="border-left-color:#0ea5e9;"><strong>Gateway API</strong> &mdash; HTTPRoute-based agent traffic routing</div>
+      <div class="flow-box purple"><strong>MCP Gateway</strong> &mdash; tool federation, routing, per-agent filtering via MCPVirtualServer</div>
+      <div class="flow-box" style="border-left-color:#d29922;"><strong>Kuadrant</strong> &mdash; Authorino (auth) + Limitador (rate limits)</div>
+      <div class="flow-box green"><strong>HashiCorp Vault</strong> &mdash; secret storage for API credentials</div>
+      <div class="flow-box" style="border-left-color:#8b949e;"><strong>Kubernetes</strong> &mdash; controller-runtime, CRDs, owner references</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DESIGN PRINCIPLES ============ -->
+<section>
+  <h2>Design Principles</h2>
+  <ul>
+    <li class="fragment"><strong>Persona separation</strong> &mdash; AI Engineers commit code, Platform Engineers own GitOps and policies, neither crosses into the other's domain</li>
+    <li class="fragment"><strong>Discovery, not declaration</strong> &mdash; agents are found at runtime from their endpoints, not hand-written by anyone</li>
+    <li class="fragment"><strong>Zero code changes</strong> &mdash; security is declared in YAML by the platform team, not wired into agent code</li>
+    <li class="fragment"><strong>Label-based matching</strong> &mdash; policies select agents dynamically, not by hardcoded names</li>
+    <li class="fragment"><strong>Graceful degradation</strong> &mdash; optional CRDs (AuthPolicy, MCPServerRegistration) are skipped if not installed</li>
+    <li class="fragment"><strong>Deny by default</strong> &mdash; outbound access is blocked unless explicitly allowed per host</li>
+  </ul>
+</section>
+
+<!-- ============ INBOUND vs OUTBOUND ============ -->
+<section>
+  <h2>Inbound vs Outbound</h2>
+  <div class="two-col" style="font-size:0.65em;">
+    <div>
+      <h3 style="color:#58a6ff;">Inbound (who can call me?)</h3>
+      <div class="flow-box">
+        <strong>Reverse Proxy</strong> validates incoming requests
+        <ul style="margin-top:8px;">
+          <li>JWT claims checked by Authorino</li>
+          <li><code>allowedAgents</code> &rarr; agent identity in token</li>
+          <li><code>allowedUsers</code> &rarr; user identity in token</li>
+          <li>Unauthorized callers rejected at the gateway</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <h3 style="color:#f85149;">Outbound (what can I call?)</h3>
+      <div class="flow-box red">
+        <strong>Forward Proxy</strong> injects credentials
+        <ul style="margin-top:8px;">
+          <li>Per-host rules from <code>external.rules</code></li>
+          <li>Vault &rarr; fetch secret, inject header</li>
+          <li>Exchange &rarr; trade JWT for scoped token</li>
+          <li>Deny &rarr; block unknown hosts</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AGENT GATEWAY ============ -->
+<section>
+  <h2>The Agent Gateway</h2>
+  <p style="font-size:0.7em; color:#94a3b8;">Gateway API + MCP Gateway + this operator = a unified agent gateway handling every call pattern.</p>
+  <table>
+    <thead>
+      <tr><th>Call Pattern</th><th>Path</th><th>Enforced By</th></tr>
+    </thead>
+    <tbody>
+      <tr class="fragment">
+        <td>User &rarr; Agent</td>
+        <td>Client &rarr; <strong>Gateway</strong> &rarr; Agent</td>
+        <td>Authorino (JWT) + Limitador</td>
+      </tr>
+      <tr class="fragment">
+        <td>Agent &rarr; Agent (A2A)</td>
+        <td>Agent A &rarr; <strong>Gateway</strong> &rarr; Agent B</td>
+        <td>AuthPolicy (<code>allowedAgents</code>)</td>
+      </tr>
+      <tr class="fragment">
+        <td>Agent &rarr; MCP Tools</td>
+        <td>Agent &rarr; <strong>Gateway</strong> &rarr; <strong>MCP Gateway</strong> &rarr; MCP Server</td>
+        <td>MCPVirtualServer (tool filtering)</td>
+      </tr>
+      <tr class="fragment">
+        <td>Agent &rarr; External API</td>
+        <td>Agent &rarr; <strong>Sidecar</strong> (vault/exchange) &rarr; External</td>
+        <td>Forward proxy + credential injection</td>
+      </tr>
+      <tr class="fragment">
+        <td>Agent &rarr; Blocked Host</td>
+        <td>Agent &rarr; <strong>Sidecar</strong> (deny)</td>
+        <td>Default deny policy</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="fragment" style="font-size:0.55em; color:#94a3b8; margin-top:12px;">Every call &mdash; inbound, agent-to-agent, MCP, and outbound &mdash; goes through an enforcement point. No direct access.</p>
+</section>
+
+<!-- ============ MCP GATEWAY INTEGRATION ============ -->
+<section>
+  <h2>MCP Gateway Integration</h2>
+  <div class="two-col" style="font-size:0.65em;">
+    <div>
+      <h3 style="color:#bc8cff;">What the MCP Gateway does</h3>
+      <div class="flow-box purple">
+        <ul style="margin-top:4px;">
+          <li>Aggregates tools from multiple MCP servers into a single <code>/mcp</code> endpoint</li>
+          <li>Router (ext_proc) parses tool name prefix to route to the correct backend</li>
+          <li>MCPVirtualServer filters which tools each agent can access</li>
+          <li>Single gateway, many MCP servers, per-agent tool visibility</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <h3 style="color:#39d2c0;">What this operator adds</h3>
+      <div class="flow-box teal">
+        <ul style="margin-top:4px;">
+          <li>Auto-creates <code>MCPServerRegistration</code> when agent declares <code>mcp</code> protocol</li>
+          <li>AgentPolicy <code>mcpTools.virtualServerRef</code> ties tool access to tiers</li>
+          <li>Standard tier: no MCP tools. Premium tier: <code>premium-tools-vs</code></li>
+          <li>MCP servers are discovered and registered &mdash; not hand-configured</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <pre class="fragment"><code class="language-yaml" data-trim>
+# Premium tier agents get MCP tool access
+spec:
+  mcpTools:
+    virtualServerRef: premium-tools-vs   # MCP Gateway filters tools per-agent
+  </code></pre>
+</section>
+
+<!-- ============ COMPLEMENT ============ -->
+<section>
+  <h2>Complement, Not Compete</h2>
+  <p style="font-size:0.7em; color:#94a3b8;">Both discover agents &mdash; at different stages and for different purposes.</p>
+  <div class="two-col" style="font-size:0.62em;">
+    <div>
+      <div class="flow-box">
+        <strong>Agent Registry</strong> <span class="badge badge-blue">build-time</span>
+        <ul style="margin-top:8px;">
+          <li><strong>Static discovery</strong>: LLM reads source code</li>
+          <li>Identifies dependencies, tools, models, skills</li>
+          <li>Generates BOM (bill of materials)</li>
+          <li>Promotion lifecycle (draft &rarr; published)</li>
+          <li>Eval records, supply chain governance</li>
+          <li>Answers: <strong>what does this agent depend on?</strong></li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="flow-box red">
+        <strong>Agent Access Control</strong> <span class="badge badge-red">runtime</span>
+        <ul style="margin-top:8px;">
+          <li><strong>Runtime discovery</strong>: probes live endpoints</li>
+          <li>Discovers capabilities from running agents</li>
+          <li>Generates auth, routing, rate limits, creds</li>
+          <li>Enforces policy on live traffic</li>
+          <li>Inbound + outbound + MCP tool access</li>
+          <li>Answers: <strong>what can this agent do right now?</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <p class="fragment" style="font-size:0.55em; color:#94a3b8; margin-top:12px;">Registry knows the agent's <strong>dependency graph at build time</strong>. Access Control enforces <strong>what it can actually reach at runtime</strong>. Together: full lifecycle governance.</p>
+</section>
+
+<!-- ============ WHAT'S NEXT ============ -->
+<section>
+  <h2>What's Next</h2>
+  <ul>
+    <li class="fragment">Sidecar proxy implementation (reverse + forward proxy containers)</li>
+    <li class="fragment">HashiCorp Vault integration for credential retrieval</li>
+    <li class="fragment">RFC 8693 Token Exchange implementation</li>
+    <li class="fragment">MCP protocol routing and tool exposure</li>
+    <li class="fragment">Webhook-based admission control for policy validation</li>
+    <li class="fragment">Multi-cluster federation and cross-namespace policies</li>
+    <li class="fragment">Observability: audit logs, dashboards, policy violation alerts</li>
+  </ul>
+</section>
+
+<!-- ============ QUICK START ============ -->
+<section>
+  <h1 style="font-size:1.8em;">quick start<span class="cursor"></span></h1>
+  <br>
+  <pre><code class="language-bash" data-trim>
+# Install CRDs
+make install
+
+# Run the operator
+make run
+
+# Deploy sample agents + policies
+kubectl apply -f config/samples/
+  </code></pre>
+  <p style="font-size:0.5em; color:#484f58; font-family:'JetBrains Mono',monospace; margin-top:30px;">
+    repo &rarr; <span style="color:#58a6ff;">github.com/kagenti/agent-access-control</span>
+  </p>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<div class="footer-text">Agent Access Control</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  controls: false,
+  progress: true,
+  slideNumber: 'c/t',
+  transition: 'fade',
+  transitionSpeed: 'fast',
+  center: true,
+  width: 1280,
+  height: 720,
+  margin: 0.08,
+  plugins: [RevealHighlight]
+});
+</script>
+</body>
+</html>

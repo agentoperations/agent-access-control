@@ -21,15 +21,18 @@ A platform-level controller that handles all of this automatically:
 
 <img src="images/concept-solution.png" alt="The Solution" width="400">
 
-Agents contain only business logic. The controller generates all auth infrastructure. Agent developers never write auth code, manage tokens, or configure gateways.
+Agents contain only business logic. The controller generates all auth infrastructure. Two personas, clean separation:
+
+- **AI Engineers** build their agent, push the image, add a label to their Deployment manifest, and commit to git. No CRDs, no gateway config, no auth code, no `kubectl`.
+- **Platform Engineers** own the GitOps pipeline, write `AgentPolicy` CRs to define security rules per tier, and manage cluster infrastructure.
 
 ### Full System Architecture
 
-Here is the complete system — from developer to external APIs:
+Here is the complete system — from AI Engineer to external APIs:
 
 ![Full Architecture](images/arch-full-system.png)
 
-The system has six layers: Developer → Control Plane → Generated Resources → Gateway → Agent Pod → External Services. Each layer handles a specific concern, and data flows top-to-bottom (deployment) and left-to-right (runtime requests).
+The system has six layers: AI Engineer → Control Plane → Generated Resources → Gateway → Agent Pod → External Services. Each layer handles a specific concern, and data flows top-to-bottom (deployment) and left-to-right (runtime requests).
 
 ---
 
@@ -43,19 +46,19 @@ Agents are not manually registered. A discovery controller finds them automatica
 
 ![Discovery](images/concept-discovery.png)
 
-1. Developer deploys their agent with a label (`kagenti.com/agent=true`)
+1. AI Engineer adds a label (`kagenti.com/agent=true`) to their Deployment manifest and commits to git
 2. Discovery controller detects the pod
 3. Fetches the agent's metadata (A2A agent card at `/.well-known/agent.json` or MCP `tools/list`)
 4. Creates an `AgentCard` CR — the platform's internal representation of the agent
 5. The policy controller sees the AgentCard and generates infrastructure
 
-The developer never writes a CRD. The AgentCard is discovered, like a Kubernetes Node.
+The AI Engineer never writes a CRD. The AgentCard is discovered, like a Kubernetes Node.
 
 Here's the full sequence from deployment to enforcement:
 
 ![Reconciliation Sequence](images/seq-reconcile.png)
 
-The developer deploys once. Five resources are generated automatically. The gateway starts enforcing immediately.
+The AI Engineer commits once. The Platform Engineer writes one policy. GitOps deploys. Five resources are generated automatically. The gateway starts enforcing immediately.
 
 ### Concept 2: Policy Matching
 
@@ -352,22 +355,30 @@ What we demonstrated:
 6. **Cascade deletion** cleans up everything
 7. **Zero code changes** to the agents
 
-### The developer experience (production)
+### The production experience (by persona)
 
 ```
-Developer:
+AI Engineer:
   1. Build agent that serves A2A or MCP protocol
-  2. Push image
-  3. Deploy with label: kagenti.com/agent=true
-  Done.
+  2. Push image to registry
+  3. Add label kagenti.com/agent=true to Deployment manifest
+  4. Commit to git
+  Done. No CRDs, no kubectl, no gateway config, no auth code.
 
-Platform (automatic):
-  1. Discovery controller finds the agent
-  2. Fetches /.well-known/agent.json or tools/list
-  3. Creates AgentCard CR
-  4. AgentPolicy matches by label
-  5. Controller generates HTTPRoute, AuthPolicy, RateLimitPolicy, ConfigMap
-  6. Gateway and sidecar enforce everything
+Platform Engineer:
+  1. Set up GitOps pipeline (ArgoCD/Flux) for agent repos
+  2. Define AgentPolicy CRs per tier (standard, premium, etc.)
+  3. Commit policies to the platform repo
+  Done. GitOps syncs everything. One policy covers all agents matching the label.
+
+Operator (automatic):
+  1. GitOps deploys agent pod from git
+  2. Discovery controller finds the labeled agent
+  3. Fetches /.well-known/agent.json or tools/list
+  4. Creates AgentCard CR
+  5. AgentPolicy matches by label
+  6. Controller generates HTTPRoute, AuthPolicy, RateLimitPolicy, ConfigMap
+  7. Gateway and sidecar enforce everything
 ```
 
-The developer never writes a CRD, never configures a gateway, never manages tokens.
+The AI Engineer never writes a CRD, never runs kubectl, never configures a gateway, never manages tokens. The Platform Engineer never touches agent code.
