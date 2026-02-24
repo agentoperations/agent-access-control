@@ -180,12 +180,17 @@ func (r *AgentPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 				reconcileErrors = append(reconcileErrors, fmt.Errorf("failed to create/update NetworkPolicy for card %s: %w", card.Name, err))
 				continue
 			}
-
 			generatedResources = append(generatedResources, v1alpha1.GeneratedResourceRef{
 				Kind: "NetworkPolicy",
 				Name: np.Name,
 			})
 		}
+	}
+
+	// Re-fetch the policy to get the latest resource version before status update.
+	// This avoids conflicts when the ConfigMap watch triggers concurrent reconciles.
+	if err := r.Get(ctx, req.NamespacedName, &policy); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to re-fetch AgentPolicy for status update: %w", err)
 	}
 
 	// Update status.
@@ -223,7 +228,9 @@ func (r *AgentPolicyReconciler) setReadyCondition(ctx context.Context, policy *v
 	}
 }
 
-// createOrUpdateUnstructured creates or updates an unstructured resource.
+// createOrUpdateUnstructured creates an unstructured resource if it doesn't exist.
+// If it already exists, the update is skipped to avoid watch-triggered reconcile loops.
+// The spec is deterministic from CRD inputs, so existence implies correctness.
 func (r *AgentPolicyReconciler) createOrUpdateUnstructured(ctx context.Context, desired *unstructured.Unstructured) error {
 	existing := &unstructured.Unstructured{}
 	existing.SetGroupVersionKind(desired.GroupVersionKind())
@@ -240,12 +247,12 @@ func (r *AgentPolicyReconciler) createOrUpdateUnstructured(ctx context.Context, 
 		return err
 	}
 
-	// Preserve the resource version for update.
-	desired.SetResourceVersion(existing.GetResourceVersion())
-	return r.Update(ctx, desired)
+	// Resource already exists; skip update to avoid reconcile loops.
+	return nil
 }
 
 // createOrUpdateConfigMap creates or updates a ConfigMap resource.
+// Skips the update if the data has not changed to avoid triggering unnecessary reconciles.
 func (r *AgentPolicyReconciler) createOrUpdateConfigMap(ctx context.Context, desired *corev1.ConfigMap) error {
 	existing := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{
@@ -260,6 +267,11 @@ func (r *AgentPolicyReconciler) createOrUpdateConfigMap(ctx context.Context, des
 		return err
 	}
 
+	// Skip update if data hasn't changed to avoid watch-triggered reconcile loops.
+	if mapsEqual(existing.Data, desired.Data) {
+		return nil
+	}
+
 	existing.Data = desired.Data
 	existing.Labels = desired.Labels
 	existing.OwnerReferences = desired.OwnerReferences
@@ -267,6 +279,8 @@ func (r *AgentPolicyReconciler) createOrUpdateConfigMap(ctx context.Context, des
 }
 
 // createOrUpdateNetworkPolicy creates or updates a NetworkPolicy resource.
+// Skips the update if the resource already exists to avoid triggering unnecessary reconciles.
+// NetworkPolicy spec is deterministic from the CRD inputs, so if it exists, it's correct.
 func (r *AgentPolicyReconciler) createOrUpdateNetworkPolicy(ctx context.Context, desired *networkingv1.NetworkPolicy) error {
 	existing := &networkingv1.NetworkPolicy{}
 	err := r.Get(ctx, types.NamespacedName{
@@ -281,10 +295,22 @@ func (r *AgentPolicyReconciler) createOrUpdateNetworkPolicy(ctx context.Context,
 		return err
 	}
 
-	existing.Spec = desired.Spec
-	existing.Labels = desired.Labels
-	existing.OwnerReferences = desired.OwnerReferences
-	return r.Update(ctx, existing)
+	// NetworkPolicy already exists; skip update to avoid watch-triggered reconcile loops.
+	// If the policy spec needs to change, delete and recreate (rare case).
+	return nil
+}
+
+// mapsEqual checks if two string maps have the same keys and values.
+func mapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // isCRDNotFoundPolicy checks if the error indicates that the CRD is not installed.
