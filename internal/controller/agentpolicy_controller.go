@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +42,7 @@ type AgentPolicyReconciler struct {
 // +kubebuilder:rbac:groups=kuadrant.io,resources=authpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kuadrant.io,resources=ratelimitpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile handles reconciliation of AgentPolicy resources.
 func (r *AgentPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -168,6 +170,24 @@ func (r *AgentPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
+	// Create NetworkPolicies if external policy has deny as default mode.
+	if policy.Spec.External != nil && policy.Spec.External.DefaultMode == "deny" {
+		for i := range cardList.Items {
+			card := &cardList.Items[i]
+
+			np := BuildNetworkPolicy(&policy, card)
+			if err := r.createOrUpdateNetworkPolicy(ctx, np); err != nil {
+				reconcileErrors = append(reconcileErrors, fmt.Errorf("failed to create/update NetworkPolicy for card %s: %w", card.Name, err))
+				continue
+			}
+
+			generatedResources = append(generatedResources, v1alpha1.GeneratedResourceRef{
+				Kind: "NetworkPolicy",
+				Name: np.Name,
+			})
+		}
+	}
+
 	// Update status.
 	policy.Status.MatchedAgentCards = len(cardList.Items)
 	policy.Status.GeneratedResources = generatedResources
@@ -241,6 +261,27 @@ func (r *AgentPolicyReconciler) createOrUpdateConfigMap(ctx context.Context, des
 	}
 
 	existing.Data = desired.Data
+	existing.Labels = desired.Labels
+	existing.OwnerReferences = desired.OwnerReferences
+	return r.Update(ctx, existing)
+}
+
+// createOrUpdateNetworkPolicy creates or updates a NetworkPolicy resource.
+func (r *AgentPolicyReconciler) createOrUpdateNetworkPolicy(ctx context.Context, desired *networkingv1.NetworkPolicy) error {
+	existing := &networkingv1.NetworkPolicy{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      desired.Name,
+		Namespace: desired.Namespace,
+	}, existing)
+
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return r.Create(ctx, desired)
+		}
+		return err
+	}
+
+	existing.Spec = desired.Spec
 	existing.Labels = desired.Labels
 	existing.OwnerReferences = desired.OwnerReferences
 	return r.Update(ctx, existing)

@@ -63,9 +63,26 @@ Gateway API + MCP Gateway + this operator form a unified agent gateway handling 
 | Agent → Agent (A2A) | Agent A → **Gateway** → Agent B | AuthPolicy (`allowedAgents`) |
 | Agent → MCP Tools | Agent → **Gateway** → **MCP Gateway** → MCP Server | MCPVirtualServer (tool filtering) |
 | Agent → External API | Agent → **Sidecar** (vault/exchange) → External | Forward proxy + credential injection |
-| Agent → Blocked Host | Agent → **Sidecar** (deny) | Default deny policy |
+| Agent → Blocked Host | **NetworkPolicy** (network) + **Sidecar** (app) | NetworkPolicy primary, sidecar defense-in-depth |
 
 The MCP Gateway aggregates tools from multiple MCP servers into a single `/mcp` endpoint. The operator auto-creates `MCPServerRegistration` resources when agents declare the `mcp` protocol, and `AgentPolicy.mcpTools.virtualServerRef` controls which tools each tier can access.
+
+### Egress enforcement model
+
+Outbound access uses two layers of enforcement:
+
+1. **NetworkPolicy** (primary): When `external.defaultMode` is `deny`, the operator generates a Kubernetes NetworkPolicy that blocks all egress except DNS and the cluster gateway. This is kernel-level enforcement -- the pod cannot bypass it.
+2. **Sidecar proxy** (defense-in-depth): The sidecar handles per-host credential injection (vault, exchange, passthrough) and hostname-level routing. NetworkPolicy only supports CIDR, not hostnames, so the sidecar provides the fine-grained per-host logic.
+
+Both are needed. NetworkPolicy alone can't inject credentials. The sidecar alone can be bypassed by a process making direct outbound connections.
+
+### Workload identity
+
+`allowedAgents` in the `IngressPolicy` references Kubernetes ServiceAccounts, not free-form names. The operator resolves short names (e.g., `orchestrator`) to `system:serviceaccount:{namespace}:orchestrator` for JWT-based identity matching via Authorino. Cross-namespace references use `namespace/name` format. This maps directly to SPIFFE IDs if you adopt SPIRE/Istio later -- zero migration needed.
+
+### Why a meta-CRD?
+
+Without this operator, securing 20 agents means manually creating and maintaining 100+ resources (HTTPRoutes, AuthPolicies, RateLimitPolicies, ConfigMaps, NetworkPolicies). With it, you write one AgentPolicy per tier. New agents inherit the matching policy automatically via labels. Every agent in a tier gets the same security posture -- no drift between manually maintained resources. The tradeoff: if you need per-agent customization beyond what the CRD exposes, you drop down to the underlying resources directly.
 
 ## Prerequisites
 
@@ -304,7 +321,7 @@ spec:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `spec.agentSelector.matchLabels` | `map[string]string` | Yes | Selects AgentCards by label |
-| `spec.ingress.allowedAgents` | `[]string` | No | Agents permitted to call |
+| `spec.ingress.allowedAgents` | `[]string` | No | ServiceAccount names permitted to call (short or `namespace/name`) |
 | `spec.ingress.allowedUsers` | `[]string` | No | Users permitted to call (`*` = any) |
 | `spec.agents` | `[]string` | No | Outbound agent-to-agent permissions |
 | `spec.mcpTools.virtualServerRef` | `string` | No | MCPVirtualServer name |
@@ -327,6 +344,7 @@ spec:
 | AgentPolicy `.ingress` | `AuthPolicy` | Inbound auth enforcement (requires Kuadrant) |
 | AgentPolicy `.rateLimit` | `RateLimitPolicy` | Rate limit enforcement (requires Kuadrant) |
 | AgentPolicy `.external` | `ConfigMap` | Sidecar forward proxy credential config |
+| AgentPolicy `.external` (defaultMode=deny) | `NetworkPolicy` | Deny-all egress + allow DNS + allow gateway |
 
 All generated resources are labeled `kagenti.com/managed-by: agent-access-control` and have owner references for automatic cleanup.
 

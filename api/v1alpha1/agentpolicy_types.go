@@ -38,7 +38,10 @@ type AgentSelector struct {
 
 // IngressPolicy defines which agents and users are allowed to access the selected agents.
 type IngressPolicy struct {
-	// AllowedAgents is a list of agent names permitted to communicate with the selected agents.
+	// AllowedAgents is a list of ServiceAccount names permitted to communicate with the
+	// selected agents. Use short names (e.g. "orchestrator") for same-namespace references
+	// or "namespace/name" for cross-namespace. The controller resolves these to
+	// system:serviceaccount:{namespace}:{name} for JWT-based identity matching.
 	AllowedAgents []string `json:"allowedAgents,omitempty"`
 
 	// AllowedUsers is a list of user identifiers permitted to communicate with the selected agents.

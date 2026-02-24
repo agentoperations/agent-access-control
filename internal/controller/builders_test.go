@@ -350,6 +350,115 @@ func TestContainsProtocol(t *testing.T) {
 	}
 }
 
+func TestBuildNetworkPolicy(t *testing.T) {
+	card := testAgentCard("weather", "default")
+	policy := testAgentPolicy("premium-policy", "default")
+
+	np := BuildNetworkPolicy(policy, card)
+
+	t.Run("metadata", func(t *testing.T) {
+		if np.Name != "egress-weather" {
+			t.Errorf("expected name 'egress-weather', got %q", np.Name)
+		}
+		if np.Namespace != "default" {
+			t.Errorf("expected namespace 'default', got %q", np.Namespace)
+		}
+	})
+
+	t.Run("labels", func(t *testing.T) {
+		if np.Labels[labelManagedBy] != managedByValue {
+			t.Errorf("expected managed-by label")
+		}
+		if np.Labels[labelAgentCard] != "weather" {
+			t.Errorf("expected agent-card label")
+		}
+	})
+
+	t.Run("pod_selector", func(t *testing.T) {
+		if np.Spec.PodSelector.MatchLabels["kagenti.com/agent-card"] != "weather" {
+			t.Errorf("expected pod selector to match agent-card=weather")
+		}
+	})
+
+	t.Run("policy_types", func(t *testing.T) {
+		if len(np.Spec.PolicyTypes) != 1 || np.Spec.PolicyTypes[0] != "Egress" {
+			t.Errorf("expected Egress policy type")
+		}
+	})
+
+	t.Run("egress_rules", func(t *testing.T) {
+		if len(np.Spec.Egress) != 2 {
+			t.Fatalf("expected 2 egress rules (DNS + gateway), got %d", len(np.Spec.Egress))
+		}
+		// First rule: DNS
+		dnsRule := np.Spec.Egress[0]
+		if len(dnsRule.Ports) != 2 {
+			t.Fatalf("expected 2 DNS ports (UDP + TCP), got %d", len(dnsRule.Ports))
+		}
+		if dnsRule.Ports[0].Port.IntValue() != 53 {
+			t.Errorf("expected DNS port 53, got %d", dnsRule.Ports[0].Port.IntValue())
+		}
+	})
+
+	t.Run("owner_reference", func(t *testing.T) {
+		if len(np.OwnerReferences) != 1 {
+			t.Fatalf("expected 1 owner ref, got %d", len(np.OwnerReferences))
+		}
+		if np.OwnerReferences[0].Kind != "AgentPolicy" {
+			t.Errorf("expected owner kind 'AgentPolicy', got %q", np.OwnerReferences[0].Kind)
+		}
+	})
+}
+
+func TestBuildAuthPolicy_ServiceAccountIdentity(t *testing.T) {
+	card := testAgentCard("weather", "default")
+	policy := testAgentPolicy("premium-policy", "default")
+
+	authPolicy := BuildAuthPolicy(policy, card, "agent-weather")
+
+	spec := authPolicy.Object["spec"].(map[string]interface{})
+	rules := spec["rules"].(map[string]interface{})
+	authz := rules["authorization"].(map[string]interface{})
+	agentAccess := authz["agent-access"].(map[string]interface{})
+	patternMatching := agentAccess["patternMatching"].(map[string]interface{})
+	patterns := patternMatching["patterns"].([]interface{})
+
+	if len(patterns) != 2 {
+		t.Fatalf("expected 2 patterns, got %d", len(patterns))
+	}
+
+	first := patterns[0].(map[string]interface{})
+	if first["value"] != "system:serviceaccount:default:agent-a" {
+		t.Errorf("expected SA-resolved value 'system:serviceaccount:default:agent-a', got %v", first["value"])
+	}
+
+	second := patterns[1].(map[string]interface{})
+	if second["value"] != "system:serviceaccount:default:agent-b" {
+		t.Errorf("expected SA-resolved value 'system:serviceaccount:default:agent-b', got %v", second["value"])
+	}
+}
+
+func TestResolveServiceAccount(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		namespace string
+		expected  string
+	}{
+		{"short name", "orchestrator", "default", "system:serviceaccount:default:orchestrator"},
+		{"namespaced", "other-ns/planner", "default", "system:serviceaccount:other-ns:planner"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resolveServiceAccount(tt.input, tt.namespace)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestLabelsMatchSelector(t *testing.T) {
 	objectLabels := map[string]string{
 		"tier":    "premium",

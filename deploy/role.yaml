@@ -29,6 +29,10 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # NetworkPolicies for egress enforcement
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Leader election
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]

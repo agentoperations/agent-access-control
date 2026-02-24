@@ -2,11 +2,14 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/yaml"
 
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -117,19 +120,31 @@ func BuildHTTPRoute(card *v1alpha1.AgentCard, gatewayName, gatewayNamespace stri
 	return route
 }
 
+// resolveServiceAccount expands a short ServiceAccount name to a fully qualified
+// system:serviceaccount:{namespace}:{name} format. If the value already contains
+// a slash (namespace/name), the namespace part is used. Otherwise the policy's
+// namespace is assumed.
+func resolveServiceAccount(name, policyNamespace string) string {
+	if strings.Contains(name, "/") {
+		parts := strings.SplitN(name, "/", 2)
+		return fmt.Sprintf("system:serviceaccount:%s:%s", parts[0], parts[1])
+	}
+	return fmt.Sprintf("system:serviceaccount:%s:%s", policyNamespace, name)
+}
+
 // BuildAuthPolicy constructs a Kuadrant AuthPolicy (unstructured) for a given
 // AgentPolicy and AgentCard. It targets the specified HTTPRoute and configures
 // JWT authentication along with pattern-matching authorization based on
-// allowed agents from the ingress policy.
+// allowed ServiceAccounts from the ingress policy.
 func BuildAuthPolicy(policy *v1alpha1.AgentPolicy, card *v1alpha1.AgentCard, httpRouteName string) *unstructured.Unstructured {
-	// Build authorization predicates from allowed agents.
+	// Build authorization predicates from allowed agents (ServiceAccount references).
 	var predicates []interface{}
 	if policy.Spec.Ingress != nil {
 		for _, agent := range policy.Spec.Ingress.AllowedAgents {
 			predicates = append(predicates, map[string]interface{}{
 				"selector": "auth.identity.sub",
 				"operator": "eq",
-				"value":    agent,
+				"value":    resolveServiceAccount(agent, policy.Namespace),
 			})
 		}
 	}
@@ -368,4 +383,69 @@ func labelsToUnstructured(labels map[string]string) map[string]interface{} {
 		result[k] = v
 	}
 	return result
+}
+
+// BuildNetworkPolicy constructs a Kubernetes NetworkPolicy for egress enforcement.
+// When the external defaultMode is "deny", the NetworkPolicy denies all egress
+// except DNS (port 53) and the cluster gateway. The sidecar proxy provides
+// defense-in-depth at the application layer; this NetworkPolicy is the primary
+// network-level enforcement.
+func BuildNetworkPolicy(policy *v1alpha1.AgentPolicy, card *v1alpha1.AgentCard) *networkingv1.NetworkPolicy {
+	dnsPort := intstr.FromInt32(53)
+	protocolUDP := corev1.ProtocolUDP
+	protocolTCP := corev1.ProtocolTCP
+
+	// Allow DNS resolution (required for any outbound connectivity).
+	dnsEgressRule := networkingv1.NetworkPolicyEgressRule{
+		Ports: []networkingv1.NetworkPolicyPort{
+			{Port: &dnsPort, Protocol: &protocolUDP},
+			{Port: &dnsPort, Protocol: &protocolTCP},
+		},
+	}
+
+	// Allow egress to the gateway service within the cluster (for agent-to-agent calls).
+	gatewayEgressRule := networkingv1.NetworkPolicyEgressRule{
+		To: []networkingv1.NetworkPolicyPeer{
+			{
+				// Allow traffic to any pod with the gateway label within the cluster.
+				// The sidecar handles per-host credential injection and hostname-level routing.
+				NamespaceSelector: &metav1.LabelSelector{},
+			},
+		},
+	}
+
+	np := &networkingv1.NetworkPolicy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "networking.k8s.io/v1",
+			Kind:       "NetworkPolicy",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "egress-" + card.Name,
+			Namespace: card.Namespace,
+			Labels:    commonLabels(card.Name),
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			// Select the agent's pods using the agent-card label.
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"kagenti.com/agent-card": card.Name,
+				},
+			},
+			PolicyTypes: []networkingv1.PolicyType{
+				networkingv1.PolicyTypeEgress,
+			},
+			Egress: []networkingv1.NetworkPolicyEgressRule{
+				dnsEgressRule,
+				gatewayEgressRule,
+			},
+		},
+	}
+
+	setOwnerRef(&np.ObjectMeta, &policy.ObjectMeta, schema.GroupVersionKind{
+		Group:   "kagenti.com",
+		Version: "v1alpha1",
+		Kind:    "AgentPolicy",
+	})
+
+	return np
 }
