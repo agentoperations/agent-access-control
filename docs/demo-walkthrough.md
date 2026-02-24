@@ -79,9 +79,10 @@ From two CRDs, the controller generates five types of Kubernetes resources:
 | Resource | What it does | Who enforces it |
 |---|---|---|
 | **HTTPRoute** | Exposes the agent through the gateway | Gateway API |
-| **AuthPolicy** | Controls who can call the agent | Authorino (Kuadrant) |
+| **AuthPolicy** | Controls who can call the agent (ServiceAccount identity) | Authorino (Kuadrant) |
 | **RateLimitPolicy** | Limits request rate | Limitador (Kuadrant) |
-| **ConfigMap** | Sidecar outbound credential config | Auth sidecar |
+| **NetworkPolicy** | Deny-all egress + allow DNS + allow gateway (primary egress enforcement) | Kubernetes |
+| **ConfigMap** | Sidecar outbound credential config (defense-in-depth) | Auth sidecar |
 | **MCPServerRegistration** | Registers MCP tools | MCP Gateway |
 
 ### Concept 4: Inbound vs Outbound
@@ -96,7 +97,9 @@ The system splits enforcement into two directions:
 
 **Outbound** (this agent calling something else):
 - Agent-to-agent calls go through the **gateway** (same auth enforcement)
-- External API calls go through the **sidecar** (token exchange, Vault, deny)
+- **NetworkPolicy** blocks all egress at the network level (primary enforcement, kernel-level)
+- **Sidecar** handles per-host credential injection and hostname-level routing (defense-in-depth)
+- Both are needed: NetworkPolicy can't do per-host routing, sidecar can be bypassed without NetworkPolicy
 - Configured via `agents` and `external` in the AgentPolicy
 
 #### Sequence: Inbound call (user or agent calling this agent)
@@ -109,7 +112,7 @@ The caller's JWT is validated by Authorino, rate-checked by Limitador, then forw
 
 ![Agent to Agent](images/seq-agent-to-agent.png)
 
-Agent A's call goes through its sidecar (passthrough to gateway), then through the gateway where Authorino checks whether Agent A is in Agent B's `allowedAgents` list. The gateway enforces the policy — neither agent has auth code.
+Agent A's call goes through its sidecar (passthrough to gateway), then through the gateway where Authorino checks whether Agent A's ServiceAccount is in Agent B's `allowedAgents` list (resolved to `system:serviceaccount:{namespace}:{name}`). The gateway enforces the policy -- neither agent has auth code.
 
 #### Sequence: Outbound call to external API (Vault credential injection)
 

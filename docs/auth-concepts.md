@@ -202,21 +202,26 @@ external:
 
 ## Auth Flow 4: Outbound — Agent Calling a Blocked Host
 
-When an agent tries to call a host not in its allow list, the sidecar blocks it.
+Egress enforcement uses two layers:
+
+1. **NetworkPolicy** (primary): When `defaultMode: deny`, the operator generates a Kubernetes NetworkPolicy that blocks all egress except DNS and the cluster gateway. This is kernel-level enforcement -- the pod cannot bypass it.
+2. **Sidecar** (defense-in-depth): The sidecar blocks unmatched hosts at the application layer and returns a 403.
 
 ![Deny Flow](images/auth-flow-deny.png)
 
-The request never leaves the pod. The agent gets a 403 with a clear error message. This prevents:
+Both layers prevent:
 
 - Agents calling unauthorized services (data exfiltration)
 - Prompt injection attacks directing agents to attacker-controlled endpoints
 - Accidental calls to production systems from dev agents
 
+NetworkPolicy alone can't do per-host credential injection. The sidecar alone can be bypassed without NetworkPolicy. Together they provide complete egress control.
+
 ### What the AgentPolicy controls
 
 ```yaml
 external:
-  defaultMode: deny   # block everything not explicitly listed
+  defaultMode: deny   # generates NetworkPolicy + sidecar deny
 ```
 
 ---
@@ -271,9 +276,10 @@ One CRD, four auth flows, two enforcement points (gateway + sidecar), zero auth 
 | Component | Role | Configured by |
 |---|---|---|
 | **Keycloak / RHSSO** | Issues agent JWTs, performs token exchange | Platform team (realm, clients, policies) |
-| **Authorino** | Validates inbound JWTs, checks authorization rules | Controller (generates AuthPolicy from AgentPolicy) |
+| **Authorino** | Validates inbound JWTs, checks ServiceAccount-based authorization | Controller (generates AuthPolicy from AgentPolicy) |
 | **Limitador** | Enforces rate limits per caller | Controller (generates RateLimitPolicy from AgentPolicy) |
-| **Sidecar Forward Proxy** | Token exchange, Vault injection, deny list | Controller (generates ConfigMap from AgentPolicy) |
+| **NetworkPolicy** | Primary egress enforcement: deny-all + allow DNS + allow gateway | Controller (generates NetworkPolicy from AgentPolicy) |
+| **Sidecar Forward Proxy** | Defense-in-depth: per-host credential injection and routing | Controller (generates ConfigMap from AgentPolicy) |
 | **Sidecar Reverse Proxy** | Defense-in-depth inbound validation | Sidecar configuration |
 | **Vault** | Stores API keys and secrets | Platform team / ops |
 | **SPIFFE / SPIRE** | Workload identity for sidecar authentication | Platform infrastructure |
